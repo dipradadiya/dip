@@ -139,3 +139,13 @@ cython_debug/
 
 static_root
 media_root
+
+
+
+
+*.pyc
+__pycache__/
+.env
+*.sqlite3
+*.log
+.idea/
