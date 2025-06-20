@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container my-5">
+    <h2 class="mb-4 text-center">My Orders</h2>
+
+    {% if orders %}
+        {% for order in orders %}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between">
+                    <strong>Order ID: {{ order.id }}</strong>
+                    <span>{{ order.ordered_date|date:"M d, Y H:i" }}</span>
+                </div>
+                <div class="card-body">
+                    <p><strong>Status:</strong> {{ order.ordered|yesno:"Completed,Pending" }}</p>
+                    <p><strong>Payment Method:</strong> {{ order.payment.payment_method|capfirst }}</p>
+                    <p><strong>Amount Paid:</strong> ₹{{ order.payment.amount }}</p>
+
+                    <p><strong>Shipping Address:</strong><br>
+                        {{ order.shipping_address.street_address }},
+                        {{ order.shipping_address.apartment_address }}<br>
+                        {{ order.shipping_address.country }}, {{ order.shipping_address.zip }}
+                    </p>
+
+                    <p><strong>Items:</strong></p>
+                    <ul class="list-group mb-3">
+                        {% for item in order.items.all %}
+                            <li class="list-group-item d-flex justify-content-between">
+                                <div>
+                                    <strong>{{ item.item.title }}</strong> (x{{ item.quantity }})<br>
+                                    <small>Price: ₹{{ item.item.price }}</small>
+                                </div>
+                                <span>₹{{ item.get_total_item_price }}</span>
+                            </li>
+                        {% endfor %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <strong>Total</strong>
+                            <strong>₹{{ order.get_total }}</strong>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        {% endfor %}        
+    {% else %}
+        <div class="alert alert-info text-center">You haven't placed any orders yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

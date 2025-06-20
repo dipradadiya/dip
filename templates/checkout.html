@@ -1,0 +1,154 @@
+    {% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<main>
+    <div class="container wow fadeIn">
+        <h2 class="my-5 h2 text-center">Checkout Form</h2>
+        <div class="row">
+            <div class="col-md-8 mb-4">
+                <div class="card">
+                    <form method="POST" class="card-body" id="payment-form">
+                        {% csrf_token %}
+
+                        <h3>Shipping Address</h3>
+                        <div class='hideable_shipping_form'>
+                            <div class="md-form mb-4">
+                                <input type='text' placeholder='1234 Main St' id='shipping_address'
+                                       name='shipping_address' class='form-control'/>
+                                <label for="shipping_address">Address</label>
+                            </div>
+                            <div class="md-form mb-4">
+                                <input type='text' placeholder='Apartment or suite' id='shipping_address2'
+                                       name='shipping_address2' class='form-control'/>
+                                <label for="shipping_address2">Address 2 (optional)</label>
+                            </div>
+                            <div class="row">
+                                <div class="col-lg-6 mb-3">
+                                    <label for="country">Country</label>
+                                    {{ form.shipping_country }}
+                                </div>
+                                <div class="col-lg-6 mb-3">
+                                    <label for="shipping_zip">Zip Code</label>
+                                    <input type='text' placeholder='Zip code' id='shipping_zip'
+                                           name='shipping_zip' class='form-control'/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3>Payment Option</h3>
+                        <div class="d-block my-3">
+                            <div class="custom-control custom-radio">
+                                <input id="razorpay" name="payment_option" value="razorpay" type="radio"
+                                       class="custom-control-input" checked>
+                                <label class="custom-control-label" for="razorpay">Razorpay</label>
+                            </div>
+                            <div class="custom-control custom-radio">
+                                <input id="cod" name="payment_option" value="cod" type="radio"
+                                       class="custom-control-input">
+                                <label class="custom-control-label" for="cod">Cash on Delivery</label>
+                            </div>
+                        </div>
+
+                        <hr class="mb-4">
+                        <button class="btn btn-primary btn-lg btn-block" id="rzp-button" type="button">Checkout</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <h4 class="mb-3">Order Summary</h4>
+                {% include "order_snippet.html" %}
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock content %}
+
+{% block extra_scripts %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== "") {
+        const cookies = document.cookie.split(";");
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + "=")) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.getElementById("rzp-button").onclick = function (e) {
+    const paymentOption = document.querySelector('input[name="payment_option"]:checked').value;
+
+    // ✅ If COD is selected, just submit the form to place the order
+    if (paymentOption === "cod") {
+        document.getElementById("payment-form").submit();
+        return;
+    }
+
+    // ✅ If Razorpay is selected, proceed with Razorpay
+    fetch("/create-razorpay-order/", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCookie("csrftoken"),
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        const options = {
+            key: "{{ razorpay_key_id }}",
+            amount: data.amount,
+            currency: data.currency,
+            name: "Buyflick",
+            description: "Order Payment",
+            order_id: data.order_id,
+
+            handler: function (response) {
+                fetch("/razorpay-success/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": getCookie("csrftoken")
+                    },
+                    body: JSON.stringify({
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        order_id: data.order_id
+                    })
+                })
+                .then(res => res.json())
+                .then(result => {
+                    if (result.status === "success") {
+                        window.location.href = result.redirect_url;
+                    } else {
+                        alert("Something went wrong after payment. Please contact support.");
+                    }
+                })
+                .catch(err => {
+                    console.error("❌ Razorpay POST Error:", err);
+                    alert("Something went wrong after payment. Please contact support.");
+                });
+            },
+
+            theme: {
+                color: "#3399cc"
+            }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.open();
+    })
+    .catch(error => {
+        console.error("❌ Failed to create Razorpay order:", error);
+        alert("Unable to initiate payment. Please try again.");
+    });
+
+    e.preventDefault();
+};
+</script>
+{% endblock extra_scripts %}
